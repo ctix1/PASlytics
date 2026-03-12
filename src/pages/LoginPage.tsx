@@ -1,10 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Mail, Lock as LockIcon, ChevronDown, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithRedirect, GoogleAuthProvider, signInWithEmailAndPassword, getRedirectResult } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -14,33 +14,33 @@ const LoginPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleGoogleSignIn = () => {
-    setIsLoading(true);
-    setError(null);
-    const provider = new GoogleAuthProvider();
-    signInWithPopup(auth, provider)
+  useEffect(() => {
+    getRedirectResult(auth)
       .then(async (result) => {
-        const user = result.user;
-        const userDocRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(userDocRef);
+        if (result) {
+          setIsLoading(true);
+          const user = result.user;
+          const userDocRef = doc(db, "users", user.uid);
+          const docSnap = await getDoc(userDocRef);
 
-        if (!docSnap.exists()) {
-          // New user, create a document
-          await setDoc(userDocRef, {
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
-            firstName: user.displayName?.split(' ')[0] || '',
-            lastName: user.displayName?.split(' ')[1] || '',
-            notificationPreference: 'immediate',
-            role: 'Analyst',
-            status: 'Active',
-            lastActive: new Date(),
-          });
+          if (!docSnap.exists()) {
+            // New user, create a document
+            await setDoc(userDocRef, {
+              uid: user.uid,
+              email: user.email,
+              displayName: user.displayName,
+              photoURL: user.photoURL,
+              firstName: user.displayName?.split(' ')[0] || '',
+              lastName: user.displayName?.split(' ')[1] || '',
+              notificationPreference: 'immediate',
+              role: 'Analyst',
+              status: 'Active',
+              lastActive: new Date(),
+            });
+          }
+
+          navigate('/dashboard');
         }
-
-        navigate('/dashboard');
       })
       .catch((error) => {
         console.error(error);
@@ -49,6 +49,13 @@ const LoginPage = () => {
       .finally(() => {
         setIsLoading(false);
       });
+  }, [navigate]);
+
+  const handleGoogleSignIn = () => {
+    setIsLoading(true);
+    setError(null);
+    const provider = new GoogleAuthProvider();
+    signInWithRedirect(auth, provider);
   };
 
   const handleEmailPasswordSignIn = (e: React.FormEvent) => {
